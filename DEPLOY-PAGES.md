@@ -1,52 +1,40 @@
 # Публикация на GitHub Pages
 
-Готовая **статическая** сборка лежит в папке [`docs/`](docs/). Сервер не нужен:
-PostgreSQL (PGlite) выполняется прямо в браузере пользователя.
+Сайт **уже опубликован**:
 
-## 1. Создайте репозиторий
+- Репозиторий: https://github.com/atanaq/sql-academy
+- Сайт: **https://atanaq.github.io/sql-academy/**
+- Источник Pages: ветка `main`, папка `/docs`
 
-На GitHub: **New repository** → имя (например, `sql-academy`) → **Public** → Create.
+Статическая сборка лежит в [`docs/`](docs/). Сервер не нужен: PostgreSQL
+(PGlite) выполняется прямо в браузере.
 
-## 2. Загрузите проект
+## Как это было сделано
 
-Вариант A — через git (из папки проекта):
+1. Создан репозиторий `atanaq/sql-academy`.
+2. Проект запушен в ветку `main`.
+3. Settings → Pages → Source: Deploy from a branch → `main` → `/docs`.
+
+## Обновление сайта
+
+После изменений в `docs/`:
 
 ```bash
-git remote add origin https://github.com/<USER>/<REPO>.git
-git branch -M main
-git push -u origin main
+git add -A
+git commit -m "update"
+git push
 ```
 
-(Репозиторий уже инициализирован и закоммичен.)
+GitHub Pages пересоберёт сайт автоматически за 1–2 минуты.
 
-Вариант B — через веб-интерфейс: загрузите **содержимое папки `docs/`** в корень
-репозитория. Тогда на шаге 3 выберите папку `/ (root)`.
+## Если делаете с нуля
 
-## 3. Включите Pages
+1. Создайте репозиторий на GitHub.
+2. Запушьте проект (или содержимое `docs/`).
+3. Settings → Pages → Deploy from a branch → `main` → `/docs` → Save.
 
-**Settings → Pages → Build and deployment**:
+## Локальная проверка
 
-- Source: **Deploy from a branch**
-- Branch: **main**, folder: **/docs**
-- **Save**
-
-## 4. Откройте сайт
-
-Через 1–2 минуты:
-
+```bash
+node serve-docs.mjs    # http://localhost:5055
 ```
-https://<USER>.github.io/<REPO>/
-```
-
-## Важно
-
-- Первый запуск скачивает WASM PostgreSQL (~15–20 МБ) — на мобильном интернете
-  возможна пауза. Дальше браузер кэширует.
-- `docs/.nojekyll` уже добавлен, чтобы GitHub Pages не обрабатывал файлы через Jekyll.
-- Все запросы (тренажёр, песочница, справочник) выполняются локально в браузере;
-  сеть после загрузки не нужна.
-- Локальная проверка статической сборки:
-
-  ```bash
-  node serve-docs.mjs      # http://localhost:5055
-  ```
