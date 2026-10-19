@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQL Middle Academy — PostgreSQL</title>
+  <link rel="stylesheet" href="vendor/codemirror/lib/codemirror.css" />
+  <link rel="stylesheet" href="vendor/codemirror/addon/hint/show-hint.css" />
+  <link rel="stylesheet" href="vendor/codemirror/theme/dracula.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">🐘</span>
+      <div class="brand-text">
+        <span class="brand-title">SQL Middle Academy</span>
+        <span class="brand-sub">PostgreSQL · уровень middle</span>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#/lessons" data-route="lessons">📚 База знаний</a>
+      <a href="#/trainer" data-route="trainer">🎯 Тренажёр</a>
+      <a href="#/sandbox" data-route="sandbox">🧪 Песочница</a>
+      <a href="#/reference" data-route="reference">📖 Справочник</a>
+      <a href="#/schema" data-route="schema">🗄️ Схема БД</a>
+    </nav>
+  </header>
+
+  <main id="app"></main>
+
+  <script src="vendor/codemirror/lib/codemirror.js"></script>
+  <script src="vendor/codemirror/mode/sql/sql.js"></script>
+  <script src="vendor/codemirror/addon/hint/show-hint.js"></script>
+  <script src="vendor/codemirror/addon/hint/sql-hint.js"></script>
+  <script src="vendor/codemirror/addon/edit/closebrackets.js"></script>
+  <script src="vendor/codemirror/addon/selection/active-line.js"></script>
+  <script src="vendor/codemirror/addon/comment/comment.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
