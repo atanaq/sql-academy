@@ -1,11 +1,21 @@
 // Браузерный движок: PGlite (PostgreSQL в WASM) + данные курса.
 // Полностью заменяет серверный API — сайт становится статическим.
 
-import { PGlite } from './vendor/pglite/index.js';
 import { DATASETS } from './data/schema.js';
 import { LESSONS } from './data/lessons.js';
 import { TASKS } from './data/tasks.js';
 import { REFERENCE } from './data/reference.js';
+
+// PGlite грузим лениво: теория и справочник работают даже без WASM,
+// а тренажёр/песочница инициализируют PostgreSQL при первом запросе.
+let PGliteCtor = null;
+async function getPGliteClass() {
+  if (!PGliteCtor) {
+    const mod = await import('./vendor/pglite/index.js');
+    PGliteCtor = mod.PGlite;
+  }
+  return PGliteCtor;
+}
 
 const instances = new Map();
 const locks = new Map();
@@ -26,6 +36,7 @@ async function withLock(key, fn) {
 async function buildDataset(key) {
   const ds = DATASETS[key];
   if (!ds) throw new Error(`Неизвестный набор данных: ${key}`);
+  const PGlite = await getPGliteClass();
   const db = new PGlite();
   await db.exec(ds.ddl);
   await db.exec(ds.seedSql);
