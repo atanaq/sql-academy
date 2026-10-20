@@ -1154,6 +1154,83 @@ FROM employees;`,
     solution: `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY salary) AS median
 FROM employees;`,
   },
+
+  // ===================== DE: аналитический SQL =====================
+  {
+    id: 't43',
+    moduleId: 'analytics-sql',
+    level: 'middle',
+    title: 'Выручка по месяцам',
+    difficulty: 'easy',
+    dataset: 'shop',
+    orderSensitive: true,
+    tables: ['orders'],
+    condition: [
+      { t: 'p', text: 'Финансовый отдел просит помесячную динамику выручки магазина: сколько денег приносил каждый месяц.' },
+      { t: 'p', text: 'Дата заказа — `order_date`. Чтобы сгруппировать по месяцам, используйте `date_trunc(\'month\', order_date)` и приведите результат к `date` через `::date`, чтобы в колонке был чистый месяц без времени.' },
+      { t: 'p', text: 'Выведите `month` (начало месяца, тип date) и `revenue` (суммарная выручка). Сортировка: по месяцу по возрастанию.' },
+    ],
+    output: { columns: ['month', 'revenue'], note: 'По строке на месяц. Порядок: month ↑.' },
+    expected: `SELECT date_trunc('month', order_date)::date AS month, sum(total) AS revenue
+FROM orders
+GROUP BY date_trunc('month', order_date)
+ORDER BY month;`,
+    hint: '`date_trunc(\'month\', order_date)::date` и `sum(total)`.',
+    solution: `SELECT date_trunc('month', order_date)::date AS month, sum(total) AS revenue
+FROM orders
+GROUP BY date_trunc('month', order_date)
+ORDER BY month;`,
+  },
+  {
+    id: 't44',
+    moduleId: 'analytics-sql',
+    level: 'middle',
+    title: 'Сколько заказов у каждого клиента',
+    difficulty: 'easy',
+    dataset: 'shop',
+    orderSensitive: true,
+    tables: ['customers', 'orders'],
+    condition: [
+      { t: 'p', text: 'Маркетинг хочет увидеть частоту покупок: сколько заказов сделал каждый клиент, включая тех, кто не купил ни разу.' },
+      { t: 'p', text: 'Клиентов без заказов тоже нужно показать — используйте `LEFT JOIN` и `count(o.id)` (а не `count(*)`).' },
+      { t: 'p', text: 'Выведите `name` (имя клиента) и `orders` (число заказов). Сортировка: по числу заказов по убыванию, затем по имени.' },
+    ],
+    output: { columns: ['name', 'orders'], note: 'Все клиенты, включая 0 заказов. Порядок: orders ↓, затем name.' },
+    expected: `SELECT c.name, count(o.id) AS orders
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+GROUP BY c.name
+ORDER BY orders DESC, c.name;`,
+    hint: '`LEFT JOIN orders` + `count(o.id)` + `GROUP BY c.name`.',
+    solution: `SELECT c.name, count(o.id) AS orders
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+GROUP BY c.name
+ORDER BY orders DESC, c.name;`,
+  },
+  {
+    id: 't45',
+    moduleId: 'analytics-sql',
+    level: 'middle',
+    title: 'Доля VIP-клиентов в выручке',
+    difficulty: 'medium',
+    dataset: 'shop',
+    orderSensitive: false,
+    tables: ['orders', 'customers'],
+    condition: [
+      { t: 'p', text: 'Нужно понять, насколько бизнес зависит от VIP-клиентов: какую долю всей выручки дают заказы клиентов с `vip = true`.' },
+      { t: 'p', text: 'Удобно через `sum(...) FILTER (WHERE c.vip)` для VIP-выручки и `sum(...)` для общей. Не забудьте проценты и округление.' },
+      { t: 'p', text: 'Выведите `vip_share` (доля выручки VIP в процентах, округлённая до 1 знака). Порядок строк не важен.' },
+    ],
+    output: { columns: ['vip_share'], note: 'Одна строка с процентом.' },
+    expected: `SELECT round(sum(o.total) FILTER (WHERE c.vip) * 100.0 / sum(o.total), 1) AS vip_share
+FROM orders o
+JOIN customers c ON c.id = o.customer_id;`,
+    hint: '`sum(o.total) FILTER (WHERE c.vip)` и деление на `sum(o.total)`.',
+    solution: `SELECT round(sum(o.total) FILTER (WHERE c.vip) * 100.0 / sum(o.total), 1) AS vip_share
+FROM orders o
+JOIN customers c ON c.id = o.customer_id;`,
+  },
 ];
 
 export function taskSummary() {
