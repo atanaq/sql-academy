@@ -45,6 +45,19 @@ node serve-docs.mjs   # локально: http://localhost:5055
 
 Папка `docs/` публикуется на GitHub Pages как есть (source: `main`, folder `/docs`).
 
+### Публикация
+
+```bash
+# PowerShell
+$env:GH_TOKEN='<fine-grained token>'; node publish.mjs
+# bash
+GH_TOKEN=<token> node publish.mjs
+```
+
+Токен — fine-grained, только на репозиторий `atanaq/sql-academy`, право
+`Contents: Read and write`. Скрипт пушит `main`, включает/обновляет Pages (`/docs`)
+и ждёт сборку.
+
 ## Структура проекта
 
 ```
@@ -60,7 +73,7 @@ server/
     lessons-de-pipeline.js # DE: моделирование, ETL/ELT, Airflow, dbt
     lessons-de-bigdata.js  # DE: Spark, Kafka, хранилища, lakehouse, облака
     lessons-de-arch.js     # DE: качество, архитектура, аналитика, собеседование
-    tasks.js               # 42 SQL-задачи
+    tasks.js               # 45 SQL-задач
     reference.js           # справочник
 public/
   index.html, styles.css, app.js   # SPA (Node-версия)
