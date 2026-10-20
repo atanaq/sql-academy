@@ -566,3 +566,6 @@ select:focus { outline: none; border-color: var(--accent-border); }
 .project-step.done { border-color: rgba(47,208,122,0.4); background: var(--green-soft); }
 .project-step input { margin-top: 4px; }
 .project-step span { font-size: 14px; }
+
+/* ================= Roadmap tools ================= */
+.roadmap-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 18px; }

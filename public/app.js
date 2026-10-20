@@ -72,6 +72,41 @@ function toggleProjectStep(projectId, index) {
   saveState('de.projectProgress', projectProgress);
 }
 
+function exportProgress() {
+  const data = { lessonProgress, quizProgress, pythonProgress, projectProgress, sqlProgress: progress };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'de-academy-progress.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function importProgress(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(String(reader.result));
+      if (d.lessonProgress) { lessonProgress = d.lessonProgress; saveState('de.lessonProgress', lessonProgress); }
+      if (d.quizProgress) { quizProgress = d.quizProgress; saveState('de.quizProgress', quizProgress); }
+      if (d.pythonProgress) { pythonProgress = d.pythonProgress; saveState('de.pythonProgress', pythonProgress); }
+      if (d.projectProgress) { projectProgress = d.projectProgress; saveState('de.projectProgress', projectProgress); }
+      if (d.sqlProgress) { progress = d.sqlProgress; saveState('sqlAcademy.progress', progress); }
+      renderRoadmap();
+    } catch { alert('Не удалось прочитать файл прогресса.'); }
+  };
+  reader.readAsText(file);
+}
+
+function resetProgress() {
+  if (!confirm('Сбросить весь прогресс по программе?')) return;
+  lessonProgress = {}; quizProgress = {}; pythonProgress = {}; projectProgress = {}; progress = {};
+  saveState('de.lessonProgress', {}); saveState('de.quizProgress', {});
+  saveState('de.pythonProgress', {}); saveState('de.projectProgress', {});
+  saveState('sqlAcademy.progress', {});
+  renderRoadmap();
+}
+
 // Уровни и фильтры
 const LEVEL_LABEL = { junior: 'Junior', middle: 'Middle', senior: 'Senior' };
 const TRACK_LABEL = {
@@ -281,7 +316,8 @@ async function renderLessons(lessonId) {
       ${['all', 'junior', 'middle', 'senior'].map((lv) => `<button class="lvl-btn lvl-${lv} ${lessonsLevelFilter === lv ? 'active' : ''}" data-lv="${lv}">${lv === 'all' ? 'Все' : LEVEL_LABEL[lv]}</button>`).join('')}
     </div>`;
   const trackSelect = `<select id="lesson-track" style="width:100%;margin:0 8px 10px;max-width:270px">${Object.keys(TRACK_LABEL).map((t) => `<option value="${t}" ${lessonsTrackFilter === t ? 'selected' : ''}>${TRACK_LABEL[t]}</option>`).join('')}</select>`;
-  let sideHtml = `<div class="side-title">Темы курса · ${lessons.length}</div>${levelBtns}${trackSelect}`;
+  const searchInput = `<input id="lesson-search" placeholder="Поиск по темам…" style="width:calc(100% - 16px);margin:0 8px 10px;background:var(--bg-panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text)">`;
+  let sideHtml = `<div class="side-title">Темы курса · ${lessons.length}</div>${searchInput}${levelBtns}${trackSelect}`;
   let lastLevel = null;
   for (const l of lessons) {
     if (l.level !== lastLevel) {
@@ -301,6 +337,17 @@ async function renderLessons(lessonId) {
   document.getElementById('lesson-track').addEventListener('change', (e) => {
     lessonsTrackFilter = e.target.value;
     renderLessons();
+  });
+  document.getElementById('lesson-search').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    let visible = 0;
+    side.querySelectorAll('.side-item').forEach((el) => {
+      const show = !q || el.textContent.toLowerCase().includes(q);
+      el.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const t = side.querySelector('.side-title');
+    if (t) t.textContent = `Темы курса · ${visible}`;
   });
   side.querySelectorAll('.side-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = `#/lessons/${el.dataset.id}`; });
@@ -713,6 +760,12 @@ async function renderRoadmap() {
   app.innerHTML = `<section class="pane-main narrow">
     <h1>🧭 Путь Data Engineer: с нуля до middle</h1>
     <p class="intro">Пошаговая программа на 6–9 месяцев (10–15 часов в неделю): теория → практика → проекты → собеседование. Проходите фазы по порядку, отмечайте модули и решайте задачи.</p>
+    <div class="roadmap-tools">
+      <button class="btn ghost small" id="progress-export">⬇ Экспорт прогресса</button>
+      <button class="btn ghost small" id="progress-import">⬆ Импорт</button>
+      <button class="btn ghost small" id="progress-reset">🗑 Сброс</button>
+      <input type="file" id="progress-file" accept="application/json,.json" style="display:none">
+    </div>
     <div class="dash-grid">
       <div class="dash-card"><div class="dash-num">${doneModules}/${lessons.length}</div><div class="dash-lbl">модулей изучено</div></div>
       <div class="dash-card"><div class="dash-num">${solvedTasks}/${tasks.length}</div><div class="dash-lbl">SQL-задач решено</div></div>
@@ -739,6 +792,10 @@ async function renderRoadmap() {
       </div>`;
     }).join('')}
   </section>`;
+  document.getElementById('progress-export').addEventListener('click', exportProgress);
+  document.getElementById('progress-import').addEventListener('click', () => document.getElementById('progress-file').click());
+  document.getElementById('progress-file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) importProgress(f); });
+  document.getElementById('progress-reset').addEventListener('click', resetProgress);
 }
 
 // ============================================================
