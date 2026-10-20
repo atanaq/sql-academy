@@ -1,0 +1,86 @@
+// Проекты для портфолио: цель, стек, шаги, критерии приёмки.
+
+export const PROJECTS = [
+  {
+    id: 'p-weather',
+    title: 'ETL: погодные данные из API в PostgreSQL',
+    level: 'junior',
+    stack: ['Python', 'requests', 'pandas', 'PostgreSQL', 'Airflow'],
+    goal: 'Собрать пайплайн: API → сырые данные → очистка → таблица в Postgres → ежедневное расписание. Первый проект в портфолио.',
+    steps: [
+      { title: 'Выбрать источник', detail: 'Например, Open-Meteo (без ключа) или любой открытый API с историей за несколько дней.' },
+      { title: 'Загрузить сырые данные', detail: 'Скрипт на requests: пагинация/ретраи, сохранение JSON в raw-зону (файл или таблица raw_weather).' },
+      { title: 'Трансформировать', detail: 'pandas: типы, дубликаты, пропуски, нормализация дат; получить таблицу weather_daily (city, date, temp_min, temp_max, precipitation).' },
+      { title: 'Загрузить в Postgres', detail: 'Идемпотентный upsert по ключу (city, date); DDL с PK и индексами.' },
+      { title: 'Оркестрация', detail: 'DAG в Airflow: extract → transform → load, ретраи, catchup за последние N дней.' },
+      { title: 'Проверки качества', detail: 'Тест: нет дублей, дата не в будущем, температура в разумных пределах; алерт при нарушении.' },
+    ],
+    acceptance: [
+      'Повторный запуск не создаёт дублей (идемпотентность).',
+      'За один запуск догружается минимум 7 дней истории.',
+      'Есть DDL, ETL-скрипт и DAG в репозитории, README с запуском.',
+      'Есть хотя бы один тест качества данных и лог выполнения.',
+    ],
+    tips: ['Начните с локального Postgres в Docker', 'Секреты — в переменные окружения, не в код', 'Логируйте количество строк на каждом шаге'],
+  },
+  {
+    id: 'p-shop-dwh',
+    title: 'DWH: витрина интернет-магазина',
+    level: 'middle',
+    stack: ['SQL', 'PostgreSQL', 'dbt', 'Airflow'],
+    goal: 'Спроектировать star schema и витрины для аналитики продаж: выручка, топ-товары, retention клиентов.',
+    steps: [
+      { title: 'Изучить источник', detail: 'Таблицы customers, products, orders, order_items. Определить grain факта продаж — одна позиция заказа.' },
+      { title: 'Спроектировать модель', detail: 'fact_sales + dim_customer, dim_product, dim_date; суррогатные ключи; SCD2 для клиентов (опционально).' },
+      { title: 'Собрать staging', detail: 'dbt staging-модели: очистка, типы, дедупликация, переименование.' },
+      { title: 'Собрать marts', detail: 'mart_revenue_by_day, mart_top_products, mart_customer_retention; тесты not_null/unique/relationships.' },
+      { title: 'Оркестрация и документация', detail: 'Airflow запускает dbt; dbt docs с lineage; README с описанием модели.' },
+    ],
+    acceptance: [
+      'Есть ER-диаграмма/описание модели и обоснование grain.',
+      'dbt-модели проходят тесты (unique, not_null, relationships).',
+      'Метрики выручки совпадают с контрольным SQL-запросом по источнику.',
+      'Пайплайн воспроизводится одной командой в чистом окружении.',
+    ],
+    tips: ['Сначала напишите контрольные запросы «в лоб», потом модели', 'Не смешивайте staging и бизнес-логику', 'Задокументируйте каждую метрику'],
+  },
+  {
+    id: 'p-kafka',
+    title: 'Стриминг: события заказов через Kafka',
+    level: 'middle',
+    stack: ['Kafka', 'Python', 'PostgreSQL', 'Docker'],
+    goal: 'Построить событийный пайплайн: генератор событий → Kafka → consumer с оконной агрегацией → Postgres.',
+    steps: [
+      { title: 'Поднять Kafka', detail: 'docker compose с Kafka + Zookeeper/KRaft; создать топик order_events с 3 партициями.' },
+      { title: 'Продюсер', detail: 'Python-скрипт генерирует события {order_id, customer_id, amount, ts} с ключом customer_id.' },
+      { title: 'Консьюмер', detail: 'Читает, валидирует, дедуплицирует по order_id, считает агрегаты за 1-минутные окна.' },
+      { title: 'Запись результатов', detail: 'Upsert в Postgres таблицу order_windows (window_start, orders, revenue).' },
+      { title: 'Надёжность', detail: 'Обработка рестартов, коммит offset после записи, идемпотентный upsert, метрики лага.' },
+    ],
+    acceptance: [
+      'При рестарте консьюмера данные не теряются и не дублируются (или дубли дедуплицируются).',
+      'Агрегаты за окно сходятся с пересчётом по сырым событиям.',
+      'Есть docker-compose, producer, consumer и README.',
+    ],
+    tips: ['Ключ партиционирования = customer_id для порядка по клиенту', 'Коммитьте offset после успешной записи', 'Следите за consumer lag'],
+  },
+  {
+    id: 'p-spark',
+    title: 'Big Data: PySpark-обработка больших данных',
+    level: 'middle',
+    stack: ['PySpark', 'Parquet', 'S3/MinIO', 'Airflow'],
+    goal: 'Обработать большой набор данных (например, 10+ млн строк) и построить агрегированную витрину с оптимизацией.',
+    steps: [
+      { title: 'Подготовить данные', detail: 'Сгенерировать или скачать датасет, сохранить в Parquet, партиционировать по дате.' },
+      { title: 'Написать job', detail: 'PySpark: чтение, фильтры, join, groupBy, оконные функции; запись результата в Parquet.' },
+      { title: 'Оптимизировать', detail: 'Проверить план, убрать лишние shuffle, использовать broadcast для маленькой таблицы, настроить партиции.' },
+      { title: 'Оркестрация', detail: 'Запуск через Airflow/скрипт, параметры даты, идемпотентная перезапись партиции.' },
+    ],
+    acceptance: [
+      'Job обрабатывает датасет и пишет партиционированный результат.',
+      'В README есть сравнение «до/после» оптимизации (время, shuffle).',
+      'Повторный запуск за ту же дату не плодит дубли.',
+    ],
+    tips: ['Смотрите Spark UI: stage, shuffle read/write', 'Избегайте collect() на больших данных', 'Кэшируйте только переиспользуемые DataFrame'],
+  },
+];

@@ -1,5 +1,11 @@
 import { localApi } from './browser-api.js';
 
+import { ROADMAP } from './data/roadmap.js';
+import { QUIZZES } from './data/quizzes.js';
+import { INTERVIEW } from './data/interview.js';
+import { PROJECTS } from './data/projects.js';
+import { PYTHON_TASKS } from './data/python-tasks.js';
+
 'use strict';
 
 /* ============================================================
@@ -34,9 +40,40 @@ let drafts = loadState('sqlAcademy.drafts', {});         // taskId -> sql
 let sandboxSql = loadState('sqlAcademy.sandboxSql', null);
 let sandboxDataset = loadState('sqlAcademy.sandboxDataset', 'company');
 
+// Прогресс по программе Data Engineer
+let lessonProgress = loadState('de.lessonProgress', {});     // moduleId -> true
+let quizProgress = loadState('de.quizProgress', {});         // quizId -> best score (0..1)
+let pythonProgress = loadState('de.pythonProgress', {});     // taskId -> 'solved'
+let projectProgress = loadState('de.projectProgress', {});   // projectId -> { stepIndex: true }
+
+function markLesson(id, val) {
+  if (val) lessonProgress[id] = true; else delete lessonProgress[id];
+  saveState('de.lessonProgress', lessonProgress);
+}
+function saveQuizScore(id, score) {
+  quizProgress[id] = Math.max(quizProgress[id] || 0, score);
+  saveState('de.quizProgress', quizProgress);
+}
+function markPython(id, val) {
+  if (val) pythonProgress[id] = 'solved'; else delete pythonProgress[id];
+  saveState('de.pythonProgress', pythonProgress);
+}
+function toggleProjectStep(projectId, index) {
+  const p = projectProgress[projectId] || {};
+  if (p[index]) delete p[index]; else p[index] = true;
+  projectProgress[projectId] = p;
+  saveState('de.projectProgress', projectProgress);
+}
+
 // Уровни и фильтры
 const LEVEL_LABEL = { junior: 'Junior', middle: 'Middle', senior: 'Senior' };
+const TRACK_LABEL = {
+  all: 'Все темы', sql: 'SQL', foundations: 'Основы', python: 'Python', modeling: 'Моделирование',
+  pipeline: 'ETL и оркестрация', bigdata: 'Big Data', streaming: 'Стриминг', warehouse: 'Хранилища',
+  cloud: 'Облака', quality: 'Качество данных', architecture: 'Архитектура', analytics: 'Аналитика', career: 'Карьера',
+};
 let lessonsLevelFilter = 'all';
+let lessonsTrackFilter = 'all';
 let trainerLevelFilter = 'all';
 
 function markTask(taskId, val) {
@@ -135,19 +172,21 @@ function renderBlocks(blocks, { sandboxButtons = false } = {}) {
         const rows = b.rows.map((r) => `<tr>${r.map((c) => `<td>${renderInline(String(c))}</td>`).join('')}</tr>`).join('');
         return `<div class="table-wrap" style="margin:14px 0"><table class="data"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
       }
-      case 'sql': return renderCodeBlock(b.text, b.caption, sandboxButtons);
+      case 'sql': return renderCodeBlock(b.text, b.caption, sandboxButtons, 'sql');
+      case 'code': return renderCodeBlock(b.text, b.caption, false, b.lang || 'code');
       default: return '';
     }
   }).join('');
 }
 
-function renderCodeBlock(code, caption, sandboxButtons) {
+function renderCodeBlock(code, caption, sandboxButtons, lang) {
   const btns = [];
   if (sandboxButtons) btns.push(`<button class="btn small icon" data-run-sandbox="${escapeHtml(code).replace(/"/g, '&quot;')}" title="Открыть в песочнице">▶ в песочницу</button>`);
   btns.push(`<button class="btn small icon" data-copy="${escapeHtml(code).replace(/"/g, '&quot;')}" title="Скопировать">Копировать</button>`);
+  const isSql = (lang || 'sql').toLowerCase() === 'sql';
   return `<div class="codeblock">
-    <div class="codebar"><span class="cap">${caption ? escapeHtml(caption) : 'SQL'}</span><div class="actions">${btns.join('')}</div></div>
-    <pre><code>${highlightSql(code)}</code></pre>
+    <div class="codebar"><span class="cap">${escapeHtml(caption || lang || 'SQL')}</span><div class="actions">${btns.join('')}</div></div>
+    <pre><code>${isSql ? highlightSql(code) : escapeHtml(code)}</code></pre>
   </div>`;
 }
 
@@ -173,9 +212,9 @@ function renderResultTable(result) {
 }
 
 // ---------- CodeMirror ----------
-function createEditor(el, onRun) {
+function createEditor(el, onRun, opts = {}) {
   return CodeMirror(el, {
-    mode: 'text/x-pgsql',
+    mode: opts.mode || 'text/x-pgsql',
     theme: 'dracula',
     lineNumbers: true,
     lineWrapping: false,
@@ -197,18 +236,23 @@ function createEditor(el, onRun) {
 
 // ---------- Роутер ----------
 function navigate() {
-  const hash = location.hash.replace(/^#\/?/, '') || 'lessons';
+  const hash = location.hash.replace(/^#\/?/, '') || 'roadmap';
   const [page, param] = hash.split('/');
   document.querySelectorAll('.nav a').forEach((a) => {
     a.classList.toggle('active', a.dataset.route === page);
   });
   switch (page) {
+    case 'roadmap': renderRoadmap(); break;
     case 'lessons': renderLessons(param); break;
     case 'trainer': renderTrainer(param); break;
+    case 'python': renderPython(param); break;
+    case 'quiz': renderQuiz(param); break;
+    case 'interview': renderInterview(); break;
+    case 'projects': renderProjects(param); break;
     case 'sandbox': renderSandbox(); break;
     case 'reference': renderReference(); break;
     case 'schema': renderSchema(); break;
-    default: renderLessons(param);
+    default: renderRoadmap();
   }
 }
 window.addEventListener('hashchange', navigate);
@@ -218,16 +262,19 @@ window.addEventListener('hashchange', navigate);
 // ============================================================
 async function renderLessons(lessonId) {
   const allLessons = await getLessons();
-  const lessons = lessonsLevelFilter === 'all' ? allLessons : allLessons.filter((l) => l.level === lessonsLevelFilter);
+  const lessons = allLessons.filter((l) =>
+    (lessonsLevelFilter === 'all' || l.level === lessonsLevelFilter) &&
+    (lessonsTrackFilter === 'all' || (l.track || 'sql') === lessonsTrackFilter));
   const current = lessons.find((l) => l.id === lessonId) || lessons[0] || allLessons[0];
   app.innerHTML = `<div class="page">
     <aside class="pane-side" id="lesson-side"></aside>
     <section class="pane-main narrow" id="lesson-main"><div class="empty-state"><div class="big">📚</div>Загрузка…</div></section>
   </div>`;
-  const filters = `<div class="level-filter">
+  const levelBtns = `<div class="level-filter">
       ${['all', 'junior', 'middle', 'senior'].map((lv) => `<button class="lvl-btn lvl-${lv} ${lessonsLevelFilter === lv ? 'active' : ''}" data-lv="${lv}">${lv === 'all' ? 'Все' : LEVEL_LABEL[lv]}</button>`).join('')}
     </div>`;
-  let sideHtml = `<div class="side-title">Темы курса · ${lessons.length}</div>${filters}`;
+  const trackSelect = `<select id="lesson-track" style="width:100%;margin:0 8px 10px;max-width:270px">${Object.keys(TRACK_LABEL).map((t) => `<option value="${t}" ${lessonsTrackFilter === t ? 'selected' : ''}>${TRACK_LABEL[t]}</option>`).join('')}</select>`;
+  let sideHtml = `<div class="side-title">Темы курса · ${lessons.length}</div>${levelBtns}${trackSelect}`;
   let lastLevel = null;
   for (const l of lessons) {
     if (l.level !== lastLevel) {
@@ -235,7 +282,7 @@ async function renderLessons(lessonId) {
       lastLevel = l.level;
     }
     sideHtml += `<div class="side-item ${l.id === current.id ? 'active' : ''}" data-id="${l.id}">
-        <span class="ico">${l.icon}</span><span class="lbl">${escapeHtml(l.title)}</span>
+        <span class="ico">${lessonProgress[l.id] ? '✅' : l.icon}</span><span class="lbl">${escapeHtml(l.title)}</span>
       </div>`;
   }
   const side = document.getElementById('lesson-side');
@@ -244,6 +291,10 @@ async function renderLessons(lessonId) {
     lessonsLevelFilter = b.dataset.lv;
     renderLessons();
   }));
+  document.getElementById('lesson-track').addEventListener('change', (e) => {
+    lessonsTrackFilter = e.target.value;
+    renderLessons();
+  });
   side.querySelectorAll('.side-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = `#/lessons/${el.dataset.id}`; });
   });
@@ -257,9 +308,16 @@ async function renderLessons(lessonId) {
     <div class="lesson-head">
       <h1>${full.icon} ${escapeHtml(full.title)}</h1>
       <span class="badge lvl-${full.level}">${LEVEL_LABEL[full.level] || full.level}</span>
+      <span class="tag">${TRACK_LABEL[full.track || 'sql'] || full.track || 'SQL'}</span>
+      <button class="btn ghost small" id="lesson-done">${lessonProgress[full.id] ? '✅ Изучено' : '✓ Отметить изученным'}</button>
     </div>
+    ${full.outcomes?.length ? `<div class="note tip"><span class="note-label">🎯 Что освоите</span><ul class="block-list">${full.outcomes.map((o) => `<li>${renderInline(o)}</li>`).join('')}</ul></div>` : ''}
     <p class="intro">${renderInline(full.intro)}</p>
     ${sections}`;
+  document.getElementById('lesson-done').addEventListener('click', () => {
+    markLesson(full.id, !lessonProgress[full.id]);
+    renderLessons(full.id);
+  });
   bindCodeBlockButtons(document.getElementById('lesson-main'));
 }
 
@@ -630,6 +688,293 @@ async function renderSchema() {
         </div>
       </div>`).join('')}
   </section>`;
+}
+
+// ============================================================
+// УЧЕБНЫЙ ПУТЬ
+// ============================================================
+async function renderRoadmap() {
+  const lessons = await getLessons();
+  const map = Object.fromEntries(lessons.map((l) => [l.id, l]));
+  const tasks = await getTasks();
+  const doneModules = lessons.filter((l) => lessonProgress[l.id]).length;
+  const solvedTasks = tasks.filter((t) => progress[t.id] === 'solved').length;
+  const quizzesDone = Object.values(quizProgress).filter((s) => s >= 0.7).length;
+  const pythonDone = Object.values(pythonProgress).filter((s) => s === 'solved').length;
+  const nextModule = ROADMAP.flatMap((p) => p.modules).map((id) => map[id]).find((m) => m && !lessonProgress[m.id]);
+
+  app.innerHTML = `<section class="pane-main narrow">
+    <h1>🧭 Путь Data Engineer: с нуля до middle</h1>
+    <p class="intro">Пошаговая программа на 6–9 месяцев (10–15 часов в неделю): теория → практика → проекты → собеседование. Проходите фазы по порядку, отмечайте модули и решайте задачи.</p>
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-num">${doneModules}/${lessons.length}</div><div class="dash-lbl">модулей изучено</div></div>
+      <div class="dash-card"><div class="dash-num">${solvedTasks}/${tasks.length}</div><div class="dash-lbl">SQL-задач решено</div></div>
+      <div class="dash-card"><div class="dash-num">${pythonDone}/${PYTHON_TASKS.length}</div><div class="dash-lbl">Python-задач</div></div>
+      <div class="dash-card"><div class="dash-num">${quizzesDone}/${QUIZZES.length}</div><div class="dash-lbl">квизов сдано</div></div>
+    </div>
+    ${nextModule ? `<div class="roadmap-next"><span class="muted">Следующий шаг:</span> <a href="#/lessons/${nextModule.id}">${nextModule.icon} ${escapeHtml(nextModule.title)}</a></div>` : '<div class="roadmap-next">🎉 Все модули отмечены! Переходите к проектам и собеседованию.</div>'}
+    ${ROADMAP.map((phase, i) => {
+      const mods = phase.modules.map((id) => map[id]).filter(Boolean);
+      const done = mods.filter((m) => lessonProgress[m.id]).length;
+      const pct = mods.length ? Math.round((done / mods.length) * 100) : 0;
+      return `<div class="phase-card">
+        <div class="phase-head">
+          <div>
+            <div class="phase-eyebrow">Фаза ${i + 1} · ${escapeHtml(phase.weeks)} · ${escapeHtml(LEVEL_LABEL[phase.level] || phase.level)}</div>
+            <h2>${escapeHtml(phase.title)}</h2>
+          </div>
+          <div class="phase-pct">${done}/${mods.length}</div>
+        </div>
+        <div class="progress-track" style="margin:8px 0 12px"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <p class="muted">${escapeHtml(phase.goal)}</p>
+        <div class="phase-modules">${mods.map((m) => `<a class="phase-module ${lessonProgress[m.id] ? 'done' : ''}" href="#/lessons/${m.id}"><span>${lessonProgress[m.id] ? '✅' : '○'} ${m.icon} ${escapeHtml(m.title)}</span></a>`).join('')}</div>
+        <details class="phase-checkpoint"><summary>✅ Чекпоинт фазы</summary><div>${escapeHtml(phase.checkpoint)}</div></details>
+      </div>`;
+    }).join('')}
+  </section>`;
+}
+
+// ============================================================
+// PYTHON-ТРЕНАЖЁР (Pyodide, реальный Python в браузере)
+// ============================================================
+const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+let pyodideInstance = null, pyodidePromise = null;
+
+async function ensurePyodide() {
+  if (pyodideInstance) return pyodideInstance;
+  if (!pyodidePromise) {
+    pyodidePromise = (async () => {
+      if (!window.loadPyodide) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = PYODIDE_CDN + 'pyodide.js';
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('Не удалось загрузить Pyodide. Нужен интернет при первом запуске.'));
+          document.head.appendChild(s);
+        });
+      }
+      pyodideInstance = await window.loadPyodide({ indexURL: PYODIDE_CDN });
+      return pyodideInstance;
+    })();
+  }
+  return pyodidePromise;
+}
+
+async function renderPython(taskId) {
+  const tasks = PYTHON_TASKS;
+  const current = tasks.find((t) => t.id === taskId) || tasks[0];
+  const idx = tasks.findIndex((t) => t.id === current.id);
+  const done = Object.values(pythonProgress).filter((v) => v === 'solved').length;
+
+  app.innerHTML = `<div class="page"><aside class="pane-side" id="py-side"></aside><section class="pane-main" id="py-main"></section></div>`;
+  const side = document.getElementById('py-side');
+  side.innerHTML = `<div class="side-title">Python-задачи · ${done}/${tasks.length}</div>` +
+    tasks.map((t) => `<div class="side-item ${t.id === current.id ? 'active' : ''}" data-id="${t.id}">
+      <span class="lbl">${pythonProgress[t.id] ? '✅ ' : ''}${escapeHtml(t.title)}</span>
+      <span class="badge lvl-${t.level}">${LEVEL_LABEL[t.level]}</span>
+    </div>`).join('');
+  side.querySelectorAll('.side-item').forEach((el) => el.addEventListener('click', () => { location.hash = `#/python/${el.dataset.id}`; }));
+
+  const main = document.getElementById('py-main');
+  main.innerHTML = `
+    <div class="trainer-head"><h1 style="margin:0">${escapeHtml(current.title)}</h1><span class="badge lvl-${current.level}">${LEVEL_LABEL[current.level]}</span></div>
+    <div class="trainer-desc">${renderBlocks([{ t: 'p', text: current.description }])}</div>
+    <div class="editor-wrap"><div class="editor-toolbar"><span class="muted" style="font-size:13px">Python · выполняется в браузере</span><span class="spacer"></span><span class="hint-kbd">Ctrl+Enter — проверить</span></div><div id="py-editor"></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" id="py-check">✓ Проверить</button>
+      <button class="btn ghost" id="py-run">▶ Запустить</button>
+      <button class="btn ghost" id="py-hint">💡 Подсказка</button>
+      <button class="btn ghost" id="py-solution">👁️ Решение</button>
+    </div>
+    <div id="py-hint"></div><div id="py-solution"></div><div id="py-result"></div>
+    <div class="pager"><button class="btn" id="py-prev" ${idx === 0 ? 'disabled' : ''}>← Назад</button><button class="btn" id="py-next" ${idx === tasks.length - 1 ? 'disabled' : ''}>Вперёд →</button><span class="muted">${idx + 1} / ${tasks.length}</span></div>`;
+
+  const editor = createEditor(document.getElementById('py-editor'), () => checkPython(current), { mode: 'text/x-python' });
+  editor.setValue(drafts['py:' + current.id] ?? current.starter);
+  editor.on('change', () => saveDraft('py:' + current.id, editor.getValue()));
+
+  document.getElementById('py-check').addEventListener('click', () => checkPython(current));
+  document.getElementById('py-run').addEventListener('click', () => runPython(current, false));
+  document.getElementById('py-hint').addEventListener('click', () => {
+    const el = document.getElementById('py-hint');
+    el.innerHTML = el.innerHTML ? '' : `<div class="hint-box">💡 ${renderInline(current.hint || 'Подсказки нет — проверьте типы, крайние случаи и имена функций.')}</div>`;
+  });
+  document.getElementById('py-solution').addEventListener('click', () => {
+    const el = document.getElementById('py-solution');
+    el.innerHTML = el.innerHTML ? '' : renderCodeBlock(current.solution, 'python', false, 'python');
+  });
+  document.getElementById('py-prev').addEventListener('click', () => { if (idx > 0) location.hash = `#/python/${tasks[idx - 1].id}`; });
+  document.getElementById('py-next').addEventListener('click', () => { if (idx < tasks.length - 1) location.hash = `#/python/${tasks[idx + 1].id}`; });
+}
+
+async function checkPython(task) {
+  await runPython(task, true);
+}
+
+async function runPython(task, withTests) {
+  const cmEl = document.querySelector('#py-editor .CodeMirror');
+  if (!cmEl) return;
+  const code = cmEl.CodeMirror.getValue();
+  const resultEl = document.getElementById('py-result');
+  resultEl.innerHTML = `<div class="result-banner" style="background:var(--bg-panel-2);color:var(--text-muted);border:1px solid var(--border)">⏳ Инициализирую Python (первый запуск ~10–20 с)…</div>`;
+  try {
+    const py = await ensurePyodide();
+    const out = [];
+    py.setStdout({ batched: (s) => out.push(s) });
+    py.setStderr({ batched: (s) => out.push(s) });
+    const full = withTests ? code + '\n' + task.tests : code;
+    await py.loadPackagesFromImports(full);
+    const ret = await py.runPythonAsync(full);
+    if (withTests) {
+      markPython(task.id, true);
+      resultEl.innerHTML = `<div class="result-banner pass">✅ Все тесты прошли!</div>${out.length ? `<div class="codeblock"><pre><code>${escapeHtml(out.join('\n'))}</code></pre></div>` : ''}`;
+    } else {
+      resultEl.innerHTML = `<div class="result-banner pass">✅ Выполнено</div><div class="codeblock"><pre><code>${escapeHtml(out.join('\n') || (ret !== undefined ? String(ret) : 'Нет вывода'))}</code></pre></div>`;
+    }
+  } catch (e) {
+    const msg = String(e.message || e);
+    resultEl.innerHTML = `<div class="result-banner fail">${withTests ? '❌ Тесты не прошли' : '❌ Ошибка выполнения'}</div><div class="codeblock"><pre><code>${escapeHtml(msg)}</code></pre></div>`;
+  }
+}
+
+// ============================================================
+// КВИЗЫ
+// ============================================================
+async function renderQuiz(quizId) {
+  if (!quizId) {
+    app.innerHTML = `<section class="pane-main narrow">
+      <h1>🧠 Квизы</h1><p class="intro">Проверьте понимание тем. Проходной результат — 70%.</p>
+      <div class="quiz-grid">${QUIZZES.map((q) => {
+        const best = quizProgress[q.id] || 0;
+        return `<a class="quiz-card" href="#/quiz/${q.id}">
+          <div class="quiz-card-title">${escapeHtml(q.title)}</div>
+          <div class="muted" style="font-size:13px">${LEVEL_LABEL[q.level] || q.level} · ${q.questions.length} вопросов</div>
+          <div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:${Math.round(best * 100)}%"></div></div>
+          <div class="muted" style="font-size:12px;margin-top:4px">${best ? 'Лучший результат: ' + Math.round(best * 100) + '%' : 'Ещё не проходили'}</div>
+        </a>`;
+      }).join('')}</div>
+    </section>`;
+    return;
+  }
+  const quiz = QUIZZES.find((q) => q.id === quizId) || QUIZZES[0];
+  app.innerHTML = `<section class="pane-main narrow" id="quiz-main"></section>`;
+  renderQuizBody(quiz);
+}
+
+function renderQuizBody(quiz) {
+  const main = document.getElementById('quiz-main');
+  main.innerHTML = `<h1>🧠 ${escapeHtml(quiz.title)}</h1>
+    <p class="muted">${LEVEL_LABEL[quiz.level] || quiz.level} · ${quiz.questions.length} вопросов</p>
+    <div class="quiz-list">${quiz.questions.map((q, qi) => `
+      <div class="quiz-q" data-q="${qi}">
+        <div class="quiz-q-text"><b>${qi + 1}.</b> ${renderInline(q.q)}</div>
+        <div class="quiz-opts">${q.options.map((o, oi) => `<label class="quiz-opt"><input type="radio" name="q${qi}" value="${oi}"> <span>${renderInline(o)}</span></label>`).join('')}</div>
+        <div class="quiz-explain" id="qx-${qi}"></div>
+      </div>`).join('')}</div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn primary" id="quiz-check">Проверить</button><a class="btn ghost" href="#/quiz">← К списку квизов</a></div>
+    <div id="quiz-result"></div>`;
+  document.getElementById('quiz-check').addEventListener('click', () => {
+    let correct = 0;
+    quiz.questions.forEach((q, qi) => {
+      const sel = document.querySelector(`input[name="q${qi}"]:checked`);
+      const val = sel ? Number(sel.value) : -1;
+      const ok = val === q.answer;
+      if (ok) correct++;
+      const wrap = document.querySelector(`.quiz-q[data-q="${qi}"]`);
+      wrap.querySelectorAll('.quiz-opt').forEach((el, oi) => {
+        el.classList.toggle('correct', oi === q.answer);
+        el.classList.toggle('wrong', oi === val && val !== q.answer);
+      });
+      const ex = document.getElementById(`qx-${qi}`);
+      ex.innerHTML = (ok ? '✅ Верно. ' : '❌ Правильный ответ выделен. ') + renderInline(q.explain);
+      ex.classList.toggle('ok', ok);
+    });
+    const score = correct / quiz.questions.length;
+    saveQuizScore(quiz.id, score);
+    document.getElementById('quiz-result').innerHTML = `<div class="result-banner ${score >= 0.7 ? 'pass' : 'fail'}">Результат: ${correct} из ${quiz.questions.length} (${Math.round(score * 100)}%)</div>`;
+  });
+}
+
+// ============================================================
+// СОБЕСЕДОВАНИЕ
+// ============================================================
+let ivTrack = 'all';
+let ivQuery = '';
+
+async function renderInterview() {
+  app.innerHTML = `<section class="pane-main narrow">
+    <h1>💬 Вопросы с собеседований</h1>
+    <p class="intro">${INTERVIEW.length} вопросов с эталонными ответами. Фильтруйте по теме и ищите по тексту.</p>
+    <div class="ref-search"><input id="iv-q" placeholder="Поиск по вопросу, ответу, тегу…" value="${escapeHtml(ivQuery)}"></div>
+    <div class="level-filter" id="iv-tracks"></div>
+    <div id="iv-list"></div>
+  </section>`;
+  const tracks = ['all', ...Array.from(new Set(INTERVIEW.map((x) => x.track)))];
+  document.getElementById('iv-tracks').innerHTML = tracks.map((t) => `<button class="lvl-btn ${ivTrack === t ? 'active' : ''}" data-track="${t}">${t === 'all' ? 'Все темы' : escapeHtml(t)}</button>`).join('');
+  document.getElementById('iv-tracks').querySelectorAll('.lvl-btn').forEach((b) => b.addEventListener('click', () => {
+    ivTrack = b.dataset.track;
+    document.getElementById('iv-tracks').querySelectorAll('.lvl-btn').forEach((x) => x.classList.toggle('active', x.dataset.track === ivTrack));
+    renderInterviewList();
+  }));
+  document.getElementById('iv-q').addEventListener('input', (e) => { ivQuery = e.target.value; renderInterviewList(); });
+  renderInterviewList();
+}
+
+function renderInterviewList() {
+  const el = document.getElementById('iv-list');
+  if (!el) return;
+  const q = ivQuery.trim().toLowerCase();
+  const items = INTERVIEW.filter((x) => (ivTrack === 'all' || x.track === ivTrack) &&
+    (!q || (x.q + ' ' + x.a + ' ' + (x.tags || []).join(' ')).toLowerCase().includes(q)));
+  el.innerHTML = items.length ? items.map((x) => `
+    <details class="interview-item">
+      <summary><span class="iv-q">${renderInline(x.q)}</span><span class="iv-tags">${(x.tags || []).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</span></summary>
+      <div class="iv-a">${renderInline(x.a)}</div>
+    </details>`).join('') : `<div class="empty-state">Ничего не найдено</div>`;
+}
+
+// ============================================================
+// ПРОЕКТЫ
+// ============================================================
+async function renderProjects(projectId) {
+  if (!projectId) {
+    app.innerHTML = `<section class="pane-main narrow">
+      <h1>🛠️ Проекты для портфолио</h1>
+      <p class="intro">End-to-end проекты, которые показывают работодателю, что вы умеете строить пайплайны. Проходите шаги и отмечайте выполненное.</p>
+      <div class="quiz-grid">${PROJECTS.map((p) => {
+        const done = Object.keys(projectProgress[p.id] || {}).length;
+        const pct = Math.round((done / p.steps.length) * 100);
+        return `<a class="quiz-card" href="#/projects/${p.id}">
+          <div class="quiz-card-title">${escapeHtml(p.title)}</div>
+          <div class="muted" style="font-size:13px">${LEVEL_LABEL[p.level] || p.level} · ${p.steps.length} шагов</div>
+          <div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="muted" style="font-size:12px;margin-top:4px">${done}/${p.steps.length} шагов · ${escapeHtml(p.stack.join(' · '))}</div>
+        </a>`;
+      }).join('')}</div>
+    </section>`;
+    return;
+  }
+  const p = PROJECTS.find((x) => x.id === projectId) || PROJECTS[0];
+  const doneMap = projectProgress[p.id] || {};
+  app.innerHTML = `<section class="pane-main narrow">
+    <a href="#/projects" class="muted" style="font-size:13px">← Все проекты</a>
+    <h1>${escapeHtml(p.title)}</h1>
+    <div class="chips">${p.stack.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join('')}</div>
+    <p class="intro">${escapeHtml(p.goal)}</p>
+    <h2>Шаги</h2>
+    <div class="project-steps">${p.steps.map((s, i) => `
+      <label class="project-step ${doneMap[i] ? 'done' : ''}">
+        <input type="checkbox" data-step="${i}" ${doneMap[i] ? 'checked' : ''}>
+        <span><b>${i + 1}. ${escapeHtml(s.title)}</b><br><span class="muted">${escapeHtml(s.detail)}</span></span>
+      </label>`).join('')}</div>
+    <h2>Критерии приёмки</h2>
+    <ul class="block-list">${p.acceptance.map((a) => `<li>${renderInline(a)}</li>`).join('')}</ul>
+    ${p.tips?.length ? `<div class="note tip"><span class="note-label">💡 Советы</span>${p.tips.map((t) => renderInline(t)).join('<br>')}</div>` : ''}
+  </section>`;
+  document.querySelectorAll('.project-steps input[type=checkbox]').forEach((cb) => cb.addEventListener('change', () => {
+    toggleProjectStep(p.id, Number(cb.dataset.step));
+    cb.closest('.project-step').classList.toggle('done', cb.checked);
+  }));
 }
 
 // ---------- старт ----------

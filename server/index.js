@@ -25,7 +25,7 @@ app.get('/api/meta', (req, res) => {
 
 // ---------- База знаний ----------
 app.get('/api/lessons', (req, res) => {
-  res.json(LESSONS.map((l) => ({ id: l.id, title: l.title, icon: l.icon, level: l.level, dataset: l.dataset, intro: l.intro, sectionCount: l.sections.length })));
+  res.json(LESSONS.map((l) => ({ id: l.id, title: l.title, icon: l.icon, level: l.level, track: l.track || 'sql', dataset: l.dataset, intro: l.intro, sectionCount: l.sections.length })));
 });
 
 app.get('/api/lessons/:id', (req, res) => {

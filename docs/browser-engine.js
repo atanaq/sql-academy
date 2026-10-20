@@ -172,7 +172,7 @@ export function meta() {
 export function lessonsList() {
   return LESSONS.map((l) => ({
     id: l.id, title: l.title, icon: l.icon, level: l.level,
-    dataset: l.dataset, intro: l.intro, sectionCount: l.sections.length,
+    track: l.track || 'sql', dataset: l.dataset, intro: l.intro, sectionCount: l.sections.length,
   }));
 }
 
