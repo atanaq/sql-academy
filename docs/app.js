@@ -45,6 +45,8 @@ let lessonProgress = loadState('de.lessonProgress', {});     // moduleId -> true
 let quizProgress = loadState('de.quizProgress', {});         // quizId -> best score (0..1)
 let pythonProgress = loadState('de.pythonProgress', {});     // taskId -> 'solved'
 let projectProgress = loadState('de.projectProgress', {});   // projectId -> { stepIndex: true }
+let notes = loadState('de.notes', {});                       // moduleId -> текст заметок
+let studyHours = loadState('de.studyHours', 10);             // часов в неделю
 
 function markLesson(id, val) {
   if (val) lessonProgress[id] = true; else delete lessonProgress[id];
@@ -360,10 +362,18 @@ async function renderLessons(lessonId) {
     </div>
     ${full.outcomes?.length ? `<div class="note tip"><span class="note-label">🎯 Что освоите</span><ul class="block-list">${full.outcomes.map((o) => `<li>${renderInline(o)}</li>`).join('')}</ul></div>` : ''}
     <p class="intro">${renderInline(full.intro)}</p>
+    <div class="notes-box">
+      <div class="notes-head">📝 Мои заметки</div>
+      <textarea id="lesson-notes" rows="4" placeholder="Конспект, вопросы, ссылки…">${escapeHtml(notes[full.id] || '')}</textarea>
+    </div>
     ${sections}`;
   document.getElementById('lesson-done').addEventListener('click', () => {
     markLesson(full.id, !lessonProgress[full.id]);
     renderLessons(full.id);
+  });
+  document.getElementById('lesson-notes').addEventListener('input', (e) => {
+    notes[full.id] = e.target.value;
+    saveState('de.notes', notes);
   });
   bindCodeBlockButtons(document.getElementById('lesson-main'));
 }
@@ -759,6 +769,11 @@ async function renderRoadmap() {
       <button class="btn ghost small" id="progress-reset">🗑 Сброс</button>
       <input type="file" id="progress-file" accept="application/json,.json" style="display:none">
     </div>
+    <div class="study-plan">
+      <span>План: при</span>
+      <input type="number" id="hours-week" min="1" max="60" value="${studyHours}">
+      <span>ч/нед — примерно <b id="plan-weeks">—</b> недель до middle (≈ 400 часов теории и практики)</span>
+    </div>
     <div class="dash-grid">
       <div class="dash-card"><div class="dash-num">${doneModules}/${lessons.length}</div><div class="dash-lbl">модулей изучено</div></div>
       <div class="dash-card"><div class="dash-num">${solvedTasks}/${tasks.length}</div><div class="dash-lbl">SQL-задач решено</div></div>
@@ -789,6 +804,15 @@ async function renderRoadmap() {
   document.getElementById('progress-import').addEventListener('click', () => document.getElementById('progress-file').click());
   document.getElementById('progress-file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) importProgress(f); });
   document.getElementById('progress-reset').addEventListener('click', resetProgress);
+  const hw = document.getElementById('hours-week');
+  const updatePlan = () => {
+    const h = Math.max(1, Number(hw.value) || 10);
+    studyHours = h;
+    saveState('de.studyHours', h);
+    document.getElementById('plan-weeks').textContent = Math.ceil(400 / h);
+  };
+  hw.addEventListener('input', updatePlan);
+  updatePlan();
 }
 
 // ============================================================

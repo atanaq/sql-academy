@@ -4,3 +4,7 @@ bin/
 .known_hosts
 *.log
 .env
+.chrome-test/
+.chrome-test2/
+dom*.html
+tmp_py_validate.py

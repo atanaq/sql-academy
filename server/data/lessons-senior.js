@@ -1370,7 +1370,7 @@ WHERE name IN ('max_connections', 'superuser_reserved_connections');` },
   },
 
   {
-    id: 'data-modeling',
+    id: 'data-modeling-sql',
     title: 'Моделирование данных и антипаттерны',
     icon: '🧩',
     level: 'senior',

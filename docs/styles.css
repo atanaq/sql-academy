@@ -569,3 +569,23 @@ select:focus { outline: none; border-color: var(--accent-border); }
 
 /* ================= Roadmap tools ================= */
 .roadmap-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 18px; }
+
+.study-plan {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 16px; font-size: 14px; color: var(--text-muted);
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px;
+}
+.study-plan input {
+  width: 70px; background: var(--bg-panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; color: var(--text); font-family: inherit;
+}
+
+.notes-box { margin: 16px 0 8px; }
+.notes-head { font-weight: 700; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.notes-box textarea {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; color: var(--text); font-family: inherit; font-size: 14px; resize: vertical;
+}
+.notes-box textarea:focus { outline: none; border-color: var(--accent-border); }
