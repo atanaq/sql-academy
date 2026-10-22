@@ -8,6 +8,7 @@ import { LESSONS_DE_PYTHON } from './lessons-de-python.js';
 import { LESSONS_DE_PIPELINE } from './lessons-de-pipeline.js';
 import { LESSONS_DE_BIGDATA } from './lessons-de-bigdata.js';
 import { LESSONS_DE_ARCH } from './lessons-de-arch.js';
+import { LESSONS_DE_INTERVIEW } from './lessons-de-interview.js';
 
 export const LESSONS = [
   ...LESSONS_JUNIOR,
@@ -18,4 +19,5 @@ export const LESSONS = [
   ...LESSONS_DE_PIPELINE,
   ...LESSONS_DE_BIGDATA,
   ...LESSONS_DE_ARCH,
+  ...LESSONS_DE_INTERVIEW,
 ];

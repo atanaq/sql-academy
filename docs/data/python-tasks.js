@@ -146,4 +146,22 @@ export const PYTHON_TASKS = [
     solution: `import pandas as pd\n\ndef fill_and_group(df):\n    df = df.copy()\n    df["amount"] = df["amount"].fillna(0)\n    return df.groupby("category", as_index=False)["amount"].sum().sort_values("amount", ascending=False)\n`,
     tests: `import pandas as pd\ndf = pd.DataFrame({"category": ["A", "B", "A"], "amount": [10, None, 5]})\nr = fill_and_group(df)\nassert list(r["category"]) == ["A", "B"]\nassert list(r["amount"]) == [15, 0]\n`,
   },
+  {
+    id: 'py-dedupe-order',
+    title: 'Дедупликация с сохранением порядка',
+    level: 'middle',
+    description: 'Функция `dedupe_order(nums)` удаляет дубликаты, сохраняя порядок первого появления. Подсказка из собеседования: `dict` в Python 3.7+ сохраняет порядок.',
+    starter: `def dedupe_order(nums):\n    # ваш код\n    pass\n`,
+    solution: `def dedupe_order(nums):\n    return list(dict.fromkeys(nums))\n`,
+    tests: `assert dedupe_order([3, 1, 3, 2, 1]) == [3, 1, 2]\nassert dedupe_order([]) == []\nassert dedupe_order([1, 1, 1]) == [1]\n`,
+  },
+  {
+    id: 'py-even-gen',
+    title: 'Генератор чётных чисел',
+    level: 'middle',
+    description: 'Напишите **генератор** `even_gen(n)`, который лениво выдаёт чётные числа от 0 до `n-1`. Используйте `yield`, а не список.',
+    starter: `def even_gen(n):\n    # ваш код\n    pass\n`,
+    solution: `def even_gen(n):\n    for x in range(n):\n        if x % 2 == 0:\n            yield x\n`,
+    tests: `assert list(even_gen(6)) == [0, 2, 4]\nassert list(even_gen(1)) == [0]\nassert list(even_gen(0)) == []\n`,
+  },
 ];

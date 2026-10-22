@@ -1231,6 +1231,43 @@ JOIN customers c ON c.id = o.customer_id;`,
 FROM orders o
 JOIN customers c ON c.id = o.customer_id;`,
   },
+  {
+    id: 't46',
+    moduleId: 'de-interview-wb',
+    level: 'middle',
+    title: 'Найдите обновлённые и удалённые записи',
+    difficulty: 'medium',
+    dataset: 'company',
+    orderSensitive: true,
+    tables: [],
+    condition: [
+      { t: 'p', text: 'Кейс с собеседования: есть `source` (новые данные) и `target` (старые данные), без CDC и триггеров. Нужно найти, что изменилось и что удалилось, только средствами SQL.' },
+      { t: 'p', text: 'Дано: `source(id, name)` = (1, a), (2, b), (3, c); `target(id, name)` = (1, a), (2, b_old), (4, d). Запишите их через CTE `VALUES` прямо в запросе.' },
+      { t: 'p', text: 'Выведите `id`, `old_name` (значение из target), `new_name` (из source; для удалённых — `NULL`) и `change_type` (`updated` или `deleted`). Отсортируйте по id.' },
+    ],
+    output: { columns: ['id', 'old_name', 'new_name', 'change_type'], note: '2 строки: id=2 updated, id=4 deleted.' },
+    expected: `WITH source(id, name) AS (VALUES (1, 'a'), (2, 'b'), (3, 'c')),
+     target(id, name) AS (VALUES (1, 'a'), (2, 'b_old'), (4, 'd'))
+SELECT t.id,
+       t.name AS old_name,
+       s.name AS new_name,
+       CASE WHEN s.id IS NULL THEN 'deleted' ELSE 'updated' END AS change_type
+FROM target t
+LEFT JOIN source s ON s.id = t.id
+WHERE s.id IS NULL OR s.name IS DISTINCT FROM t.name
+ORDER BY t.id;`,
+    hint: '`LEFT JOIN target → source`, затем `WHERE s.id IS NULL OR s.name IS DISTINCT FROM t.name`.',
+    solution: `WITH source(id, name) AS (VALUES (1, 'a'), (2, 'b'), (3, 'c')),
+     target(id, name) AS (VALUES (1, 'a'), (2, 'b_old'), (4, 'd'))
+SELECT t.id,
+       t.name AS old_name,
+       s.name AS new_name,
+       CASE WHEN s.id IS NULL THEN 'deleted' ELSE 'updated' END AS change_type
+FROM target t
+LEFT JOIN source s ON s.id = t.id
+WHERE s.id IS NULL OR s.name IS DISTINCT FROM t.name
+ORDER BY t.id;`,
+  },
 ];
 
 export function taskSummary() {
