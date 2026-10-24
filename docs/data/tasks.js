@@ -1268,6 +1268,61 @@ LEFT JOIN source s ON s.id = t.id
 WHERE s.id IS NULL OR s.name IS DISTINCT FROM t.name
 ORDER BY t.id;`,
   },
+  {
+    id: 't47',
+    moduleId: 'de-interview-block2',
+    level: 'middle',
+    title: 'Цепочки login сразу после visit',
+    difficulty: 'hard',
+    dataset: 'company',
+    orderSensitive: true,
+    tables: [],
+    condition: [
+      { t: 'p', text: 'Кейс с собеседования (live coding): есть лог `user_activity_log(client_id, action, hit_time)`. Нужно для каждого клиента за каждый месяц посчитать число цепочек, где `login` произошёл **строго сразу после** `visit` без промежуточных действий.' },
+      { t: 'p', text: "Дано: `client_id, action, hit_time` = (1, 'visit', 2024-01-01 10:00), (1, 'login', 2024-01-01 10:05), (1, 'visit', 2024-01-15 09:00), (1, 'login', 2024-01-15 09:02), (2, 'visit', 2024-02-01 12:00), (2, 'login', 2024-02-01 12:10). Задайте лог через CTE `VALUES` с `TIMESTAMP`." },
+      { t: 'p', text: 'Выведите `client_id`, `month` (месяц через `date_trunc`, приведённый к `date`) и `chains` (число цепочек). Сортировка: по `client_id`, затем по `month`.' },
+    ],
+    output: { columns: ['client_id', 'month', 'chains'], note: '2 строки: клиент 1 — 2 цепочки в январе, клиент 2 — 1 в феврале.' },
+    expected: `WITH activity(client_id, action, hit_time) AS (VALUES
+  (1, 'visit', TIMESTAMP '2024-01-01 10:00:00'),
+  (1, 'login', TIMESTAMP '2024-01-01 10:05:00'),
+  (1, 'visit', TIMESTAMP '2024-01-15 09:00:00'),
+  (1, 'login', TIMESTAMP '2024-01-15 09:02:00'),
+  (2, 'visit', TIMESTAMP '2024-02-01 12:00:00'),
+  (2, 'login', TIMESTAMP '2024-02-01 12:10:00')
+),
+with_prev AS (
+  SELECT client_id, action, hit_time,
+         lag(action) OVER (PARTITION BY client_id ORDER BY hit_time) AS prev_action
+  FROM activity
+)
+SELECT client_id,
+       date_trunc('month', hit_time)::date AS month,
+       sum(CASE WHEN action = 'login' AND prev_action = 'visit' THEN 1 ELSE 0 END) AS chains
+FROM with_prev
+GROUP BY client_id, date_trunc('month', hit_time)
+ORDER BY client_id, month;`,
+    hint: '`lag(action) OVER (PARTITION BY client_id ORDER BY hit_time) AS prev_action`, затем `CASE WHEN action = \'login\' AND prev_action = \'visit\' THEN 1 ELSE 0 END`, `date_trunc` и `GROUP BY`.',
+    solution: `WITH activity(client_id, action, hit_time) AS (VALUES
+  (1, 'visit', TIMESTAMP '2024-01-01 10:00:00'),
+  (1, 'login', TIMESTAMP '2024-01-01 10:05:00'),
+  (1, 'visit', TIMESTAMP '2024-01-15 09:00:00'),
+  (1, 'login', TIMESTAMP '2024-01-15 09:02:00'),
+  (2, 'visit', TIMESTAMP '2024-02-01 12:00:00'),
+  (2, 'login', TIMESTAMP '2024-02-01 12:10:00')
+),
+with_prev AS (
+  SELECT client_id, action, hit_time,
+         lag(action) OVER (PARTITION BY client_id ORDER BY hit_time) AS prev_action
+  FROM activity
+)
+SELECT client_id,
+       date_trunc('month', hit_time)::date AS month,
+       sum(CASE WHEN action = 'login' AND prev_action = 'visit' THEN 1 ELSE 0 END) AS chains
+FROM with_prev
+GROUP BY client_id, date_trunc('month', hit_time)
+ORDER BY client_id, month;`,
+  },
 ];
 
 export function taskSummary() {

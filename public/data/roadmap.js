@@ -107,7 +107,7 @@ export const ROADMAP = [
     weeks: '2 недели',
     level: 'middle',
     goal: 'Собрать портфолио и подготовиться к интервью.',
-    modules: ['interview-prep', 'de-interview-wb'],
+    modules: ['interview-prep', 'de-interview-wb', 'de-interview-block2'],
     checkpoint: 'Есть 1–2 end-to-end проекта в портфолио и уверенные ответы на 50+ вопросов.',
   },
 ];

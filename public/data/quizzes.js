@@ -888,5 +888,61 @@ export const QUIZZES = [
         "explain": "ClickHouse оптимизирован под сканы/агрегации; данные денормализуют заранее."
       }
     ]
+  },
+  {
+    "id": "q-de-basics-2",
+    "title": "DE: SQL, Python, HDFS",
+    "track": "sql",
+    "level": "middle",
+    "questions": [
+      {
+        "q": "Какая команда относится к DDL?",
+        "options": ["DELETE", "UPDATE", "INSERT", "TRUNCATE"],
+        "answer": 3,
+        "explain": "TRUNCATE меняет структуру/файлы таблицы и относится к DDL; DELETE/UPDATE/INSERT — DML."
+      },
+      {
+        "q": "Что возвращает место после DELETE?",
+        "options": ["ANALYZE", "VACUUM", "REINDEX", "CLUSTER"],
+        "answer": 1,
+        "explain": "VACUUM помечает мёртвые кортежи как переиспользуемые; VACUUM FULL возвращает место ОС."
+      },
+      {
+        "q": "Чем `==` отличается от `is`?",
+        "options": ["Оба по значению", "Оба по id", "== по значению, is по id", "== по id, is по значению"],
+        "answer": 2,
+        "explain": "== сравнивает значения, is — идентичность объекта (id())."
+      },
+      {
+        "q": "Что делает deepcopy?",
+        "options": ["Копирует рекурсивно всё", "Копирует только контейнер", "Удаляет вложенные объекты", "Возвращает ссылку"],
+        "answer": 0,
+        "explain": "deepcopy рекурсивно копирует вложенные структуры, copy — только верхний уровень."
+      },
+      {
+        "q": "Secondary NameNode — это…",
+        "options": ["HA-standby NameNode", "checkpoint fsimage/edits", "Хранилище блоков", "Клиент HDFS"],
+        "answer": 1,
+        "explain": "Он делает checkpoint fsimage/edits и не заменяет standby NameNode."
+      },
+      {
+        "q": "При replication factor 3 можно потерять…",
+        "options": ["1 узел", "3 узла", "Все узлы", "2 узла"],
+        "answer": 3,
+        "explain": "Без потери блока — не более K−1 = 2 узлов."
+      },
+      {
+        "q": "Predicate pushdown — это…",
+        "options": ["Сортировка перед join", "Кэш в памяти", "Фильтр ближе к источнику", "Сжатие файлов"],
+        "answer": 2,
+        "explain": "Фильтр применяется раньше, чтобы уменьшить объём данных до join."
+      },
+      {
+        "q": "Зачем нужен venv?",
+        "options": ["Изоляция зависимостей", "Ускорение Python", "Сжатие кода", "Строгая типизация"],
+        "answer": 0,
+        "explain": "venv изолирует версии Python и библиотек между проектами."
+      }
+    ]
   }
 ];
